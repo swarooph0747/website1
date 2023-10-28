@@ -13,6 +13,7 @@ import asyncio
 class NevadaPro:
     def __init__(self):
         self.main_content = []
+        self.ind_content = []
         self.domain = 'https://nevadaepro.com'
         self.main_url = 'https://nevadaepro.com/bso/view/search/external/advancedSearchBid.xhtml'
         self.headers = headers
@@ -56,7 +57,7 @@ class NevadaPro:
             await asyncio.gather(*tasks)
             page =1
             filepath = 'Pages/page{}.json'.format(page)
-            await write_json(self.main_content,filepath)
+            write_json(self.main_content,filepath)
             self.main_content.clear()
             
             self.cookies = dict(data.cookies)
@@ -89,8 +90,9 @@ class NevadaPro:
                 removed = [collection.pop(key) for key in self.rem_list]
                 self.main_content.append( collection)
                 count += 10
+            await asyncio.gather(*tasks)
             filepath = 'Pages/page{}.json'.format(page)
-            await write_json(self.main_content,filepath)
+            write_json(self.main_content,filepath)
             page += 1
             self.main_content.clear()
             rows += 25
@@ -99,14 +101,14 @@ class NevadaPro:
     async def individual_url(self,url):
 
         data = requests.get(url)
-        soup = await BeautifulSoup(data.content)
-        title = [i.text.replace('\n','').strip() for i in soup.findAll('td',attrs={'class':'t-head-01','valign':'top'})]
-        value = [i.text.replace('\n','').strip() for i in soup.findAll('td',attrs={'class':'tableText-01','valign':'top'})[:title.index('Bill-to Address:')+1]]
+        soup = BeautifulSoup(data.content)
+        title = [i.text.replace('\n','').replace('  ','').strip() for i in soup.findAll('td',attrs={'class':'t-head-01','valign':'top'})]
+        value = [i.text.replace('\n','').replace('  ','').strip() for i in soup.findAll('td',attrs={'class':'tableText-01','valign':'top'})[:title.index('Bill-to Address:')+1]]
 
         output = {k:v for k,v in zip(title,value)}
         name = output['Bid Number:'].strip()
         filepath = 'Bid_numbers/{}/{}.json'.format(name,name)
-        await write_json(self.main_content,filepath)
+        write_json(output,filepath)
         
 
     async def file_downloader(self,url):
@@ -117,8 +119,8 @@ class NevadaPro:
         options.add_experimental_option('prefs',prefs)
         driver = webdriver.Chrome(options=options)
         driver.get(f'https://nevadaepro.com/bso/external/bidDetail.sdo?docId={entry}&external=true&parentUrl=close')
-        attachments = await driver.find_element(By.XPATH,"//tr/td[contains(text(),'File Attachments:')]/parent::node()/td[2]")
-        files = await attachments.find_elements(By.TAG_NAME,'a')
+        attachments = driver.find_element(By.XPATH,"//tr/td[contains(text(),'File Attachments:')]/parent::node()/td[2]")
+        files = attachments.find_elements(By.TAG_NAME,'a')
         if len(files)> 0:
             for i in files:
                 i.click()
